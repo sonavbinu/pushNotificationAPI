@@ -13,7 +13,7 @@ const options = {
         'API to send push notification using Firebase Cloud Messaging',
     },
   },
-  apis: ['./src/index.ts'],
+  apis: ['./src/**/*.ts'],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);

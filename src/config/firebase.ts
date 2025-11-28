@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import path from 'path';
 import fs from 'fs';
+import { ServiceAccount } from 'firebase-admin';
 
 // Helper to find service account JSON in various locations (src during dev, dist when compiled)
 const candidatePaths = [
@@ -10,7 +11,7 @@ const candidatePaths = [
   path.join(__dirname, 'serviceAccountKey.json'),
 ].filter(Boolean);
 
-let serviceAccount: any = null;
+let serviceAccount: ServiceAccount | null = null;
 
 for (const p of candidatePaths) {
   try {
