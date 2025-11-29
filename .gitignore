@@ -12,8 +12,8 @@
 
 # testing
 /coverage
-serviceAccountKey.json
-*.json
+src/config/serviceAccountKey.json
+
 
 
 # next.js
