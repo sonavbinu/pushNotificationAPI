@@ -1,48 +1,34 @@
 import admin from 'firebase-admin';
-import path from 'path';
 import fs from 'fs';
-import { ServiceAccount } from 'firebase-admin';
+import path from 'path';
 
-// Helper to find service account JSON in various locations (src during dev, dist when compiled)
-const candidatePaths = [
-  process.env.GOOGLE_APPLICATION_CREDENTIALS || '',
-  path.join(process.cwd(), 'src', 'config', 'serviceAccountKey.json'),
-  path.join(process.cwd(), 'dist', 'config', 'serviceAccountKey.json'),
-  path.join(__dirname, 'serviceAccountKey.json'),
-].filter(Boolean);
+export function initFirebase() {
+  if (admin.apps.length) return admin.app();
 
-let serviceAccount: ServiceAccount | null = null;
+  // Prefer GOOGLE_APPLICATION_CREDENTIALS file (set in .env)
+  const envPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-for (const p of candidatePaths) {
-  try {
-    if (fs.existsSync(p)) {
-      serviceAccount = require(p);
-      console.log(`Loaded Firebase service account from ${p}`);
-      break;
-    }
-  } catch (err) {
-    // ignore and try next
-  }
-}
-
-try {
-  if (serviceAccount && !admin.apps.length) {
-    admin.initializeApp({
+  if (envPath && fs.existsSync(path.resolve(envPath))) {
+    const serviceAccount = require(path.resolve(envPath));
+    return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
-  } else if (!admin.apps.length) {
-    // Attempt to initialize with default credentials if ADC or GOOGLE_APPLICATION_CREDENTIALS is used
-    try {
-      admin.initializeApp();
-      console.log('Initialized Firebase admin with default credentials');
-    } catch (err) {
-      console.warn(
-        'Firebase admin not initialized (service account not provided and no ADC).'
-      );
-    }
   }
-} catch (err) {
-  console.error('Firebase admin initialization error:', err);
-}
 
-export default admin;
+  // Fallback: decode base64 JSON if provided
+  if (process.env.SERVICE_ACCOUNT_BASE64) {
+    const json = Buffer.from(
+      process.env.SERVICE_ACCOUNT_BASE64,
+      'base64'
+    ).toString('utf8');
+    const serviceAccount = JSON.parse(json);
+    return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
+
+  // Last fallback: use application default credentials (e.g., GCE/Cloud Run)
+  return admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
+}
