@@ -1,5 +1,11 @@
 import { Request, Response } from 'express';
-import admin from '../config/firebase';
+import admin from 'firebase-admin';
+import pino from 'pino';
+import { validateSendNotification } from '../middleware/validateBody';
+import { attempt, number } from 'joi';
+
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+const RETRY_ATTEMPT = Number(process.env.FCM_RETRY_ATTEMPTS || 2);
 
 // Simple timeout helper for async operations
 const timeout = (ms: number) =>
@@ -11,6 +17,25 @@ interface NotificationRequest {
   token: string;
   title: string;
   body: string;
+}
+
+async function sendMessageWithRetry(
+  message: admin.messaging.Message,
+  attempts = RETRY_ATTEMPT
+) {
+  let lastError: any;
+  for (let i = 0; i <= attempts; i++) {
+    try {
+      const result = await admin.messaging().send(message);
+      return result;
+    } catch (err) {
+      lastError = err;
+      logger.warn({ err, attempt: i }, 'FCM send failed');
+
+      await new Promise(r => setTimeout(r, 200 * (i + 1)));
+    }
+  }
+  throw lastError;
 }
 
 export const sendNotification = async (
